@@ -3,5 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
-#
+#Repo-specific
 .env/
+
+#Mac-specific
+.DS_Store
