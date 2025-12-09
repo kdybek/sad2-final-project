@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import random
 
-#Code from laboratories for SAD2 course at MIM UW.
+# Code from laboratories for SAD2 course at MIM UW.
+
+
 class BN:
     """Class representing a Boolean Network (BN) model."""
 
@@ -46,7 +48,7 @@ class BN:
     # Constructor
     # --------------------------------------------------------------------------
 
-    def __init__(self, list_of_nodes: list[str], list_of_functions: list[str]):
+    def __init__(self, list_of_nodes: list[str], list_of_functions: list[str], mode: str):
         """
         Initialize the Boolean Network.
 
@@ -54,7 +56,11 @@ class BN:
             list_of_nodes (list[str]): List of node names.
             list_of_functions (list[str]): List of Boolean expressions for each node,
                 e.g. '(x0 & ~x1) | x2', where 'x0', 'x1', and 'x2' are node names.
+            mode (str): Update mode, either 'async' or 'sync'.
         """
+        assert mode in ['async', 'sync'], "Mode must be 'async' or 'sync'."
+
+        self.mode = mode
         self.num_nodes = len(list_of_nodes)
         self.node_names = list_of_nodes
 
@@ -74,7 +80,7 @@ class BN:
 
     def get_neighbor_states(self, state: tuple[int, ...]) -> set[tuple[int, ...]]:
         """
-        Compute all states reachable from the given state in one asynchronous update.
+        Compute all states reachable from the given state in one update.
 
         Args:
             state (tuple[int, ...]): Tuple of 0s and 1s representing the current state.
@@ -82,23 +88,30 @@ class BN:
         Returns:
             set[tuple[int, ...]]: Set of next states reachable in one step.
         """
-        # TODO: Implement neighbor state computation
         neighbor_states = []
         substitutions = {
             self.list_of_nodes[i]:
                 self.__bool_algebra.TRUE if node_value == 1 else self.__bool_algebra.FALSE
             for i, node_value in enumerate(state)
         }
-        for node_index, fun in enumerate(self.functions):
-            new_node_value = 1 if fun.subs(substitutions, simplify=True) == self.__bool_algebra.TRUE else 0
-            new_state = list(state)
-            new_state[node_index] = new_node_value
+
+        if self.mode == 'sync':
+            new_state = []
+            for fun in self.functions:
+                new_node_value = 1 if fun.subs(
+                    substitutions, simplify=True) == self.__bool_algebra.TRUE else 0
+                new_state.append(new_node_value)
             neighbor_states.append(new_state)
+
+        else:  # async
+            for node_index, fun in enumerate(self.functions):
+                new_node_value = 1 if fun.subs(
+                    substitutions, simplify=True) == self.__bool_algebra.TRUE else 0
+                new_state = list(state)
+                new_state[node_index] = new_node_value
+                neighbor_states.append(new_state)
+
         return set(tuple(ns) for ns in neighbor_states)
-
-
-
-
 
     # --------------------------------------------------------------------------
     # State transition system
@@ -106,7 +119,7 @@ class BN:
 
     def generate_state_transition_system(self) -> nx.DiGraph:
         """
-        Generate the asynchronous state transition system (STS) of the Boolean network.
+        Generate the state transition system (STS) of the Boolean network.
 
         Returns:
             nx.DiGraph: Directed graph representing the STS.
@@ -136,7 +149,7 @@ class BN:
 
     def get_attractors(self) -> list[set[tuple[int]]]:
         """
-        Compute asynchronous attractors of the Boolean network.
+        Compute attractors of the Boolean network.
 
         Returns:
             list[set[tuple[int]]]: List of attractors. Each attractor is a set of states.
