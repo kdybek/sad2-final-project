@@ -1,0 +1,191 @@
+import networkx as nx
+import boolean as bool
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import random
+
+#Code from laboratories for SAD2 course at MIM UW.
+class BN:
+    """Class representing a Boolean Network (BN) model."""
+
+    __bool_algebra = bool.BooleanAlgebra()
+
+    # --------------------------------------------------------------------------
+    # Helper methods
+    # --------------------------------------------------------------------------
+
+    def __int_to_state(self, x: int) -> tuple[int, ...]:
+        """
+        Convert a non-negative integer into a Boolean state (tuple of 0s and 1s).
+
+        Args:
+            x (int): State number.
+
+        Returns:
+            tuple[int, ...]: Tuple of 0s and 1s representing the Boolean network state.
+        """
+        binary_str = format(x, '0' + str(self.num_nodes) + 'b')
+        state = [int(char) for char in binary_str]
+        return tuple(state)
+
+    @staticmethod
+    def __state_to_binary_str(state: tuple[int, ...]) -> str:
+        """
+        Convert a Boolean state (tuple) into a binary string.
+
+        Args:
+            state (tuple[int, ...]): Tuple of 0s and 1s representing the Boolean network state.
+
+        Returns:
+            str: Binary string representation of the Boolean state.
+        """
+        bin_str = ''.join(str(bit) for bit in state)
+        return bin_str
+
+    # --------------------------------------------------------------------------
+    # Constructor
+    # --------------------------------------------------------------------------
+
+    def __init__(self, list_of_nodes: list[str], list_of_functions: list[str]):
+        """
+        Initialize the Boolean Network.
+
+        Args:
+            list_of_nodes (list[str]): List of node names.
+            list_of_functions (list[str]): List of Boolean expressions for each node,
+                e.g. '(x0 & ~x1) | x2', where 'x0', 'x1', and 'x2' are node names.
+        """
+        self.num_nodes = len(list_of_nodes)
+        self.node_names = list_of_nodes
+
+        # Create Boolean symbols for nodes
+        self.list_of_nodes = [
+            self.__bool_algebra.Symbol(node_name) for node_name in list_of_nodes
+        ]
+
+        # Parse Boolean functions
+        self.functions = [
+            self.__bool_algebra.parse(fun, simplify=True) for fun in list_of_functions
+        ]
+
+    # --------------------------------------------------------------------------
+    # State transitions
+    # --------------------------------------------------------------------------
+
+    def get_neighbor_states(self, state: tuple[int, ...]) -> set[tuple[int, ...]]:
+        """
+        Compute all states reachable from the given state in one asynchronous update.
+
+        Args:
+            state (tuple[int, ...]): Tuple of 0s and 1s representing the current state.
+
+        Returns:
+            set[tuple[int, ...]]: Set of next states reachable in one step.
+        """
+        # TODO: Implement neighbor state computation
+        neighbor_states = []
+        substitutions = {
+            self.list_of_nodes[i]:
+                self.__bool_algebra.TRUE if node_value == 1 else self.__bool_algebra.FALSE
+            for i, node_value in enumerate(state)
+        }
+        for node_index, fun in enumerate(self.functions):
+            new_node_value = 1 if fun.subs(substitutions, simplify=True) == self.__bool_algebra.TRUE else 0
+            new_state = list(state)
+            new_state[node_index] = new_node_value
+            neighbor_states.append(new_state)
+        return set(tuple(ns) for ns in neighbor_states)
+
+
+
+
+
+    # --------------------------------------------------------------------------
+    # State transition system
+    # --------------------------------------------------------------------------
+
+    def generate_state_transition_system(self) -> nx.DiGraph:
+        """
+        Generate the asynchronous state transition system (STS) of the Boolean network.
+
+        Returns:
+            nx.DiGraph: Directed graph representing the STS.
+        """
+        G = nx.DiGraph()
+
+        # Loop over all possible states (2^n)
+        for initial_state_int in range(2 ** self.num_nodes):
+            initial_state = self.__int_to_state(initial_state_int)
+            neighbor_states = self.get_neighbor_states(initial_state)
+
+            G.add_node(self.__state_to_binary_str(initial_state))
+
+            # Add edges from current state to all its neighbors
+            edges = [
+                (self.__state_to_binary_str(initial_state),
+                 self.__state_to_binary_str(ns))
+                for ns in neighbor_states
+            ]
+            G.add_edges_from(edges)
+
+        return G
+
+    # --------------------------------------------------------------------------
+    # Attractor analysis
+    # --------------------------------------------------------------------------
+
+    def get_attractors(self) -> list[set[tuple[int]]]:
+        """
+        Compute asynchronous attractors of the Boolean network.
+
+        Returns:
+            list[set[tuple[int]]]: List of attractors. Each attractor is a set of states.
+        """
+        sts = self.generate_state_transition_system()
+        attractors = [attractor for attractor in nx.attracting_components(sts)]
+        return attractors
+
+    # --------------------------------------------------------------------------
+    # Visualization
+    # --------------------------------------------------------------------------
+
+    def draw_state_transition_system(self, highlight_attractors: bool = True) -> None:
+        """
+        Draw the state transition system.
+
+        Args:
+            highlight_attractors (bool, optional): If True, states belonging to different attractors
+                are drawn using distinct colors. Defaults to True.
+
+        Returns:
+            None
+        """
+        NON_ATTRACTOR_STATE_COLOR = 'grey'
+        sts = self.generate_state_transition_system()
+
+        # Assign colors to attractors if highlighting is enabled
+        if highlight_attractors:
+            attractors = self.get_attractors()
+            sts_nodes = list(sts.nodes)
+            node_colors = [NON_ATTRACTOR_STATE_COLOR for _ in sts_nodes]
+
+            colors = list(mcolors.CSS4_COLORS)
+            for color_to_remove in ('white', NON_ATTRACTOR_STATE_COLOR):
+                if color_to_remove in colors:
+                    colors.remove(color_to_remove)
+
+            for attractor in attractors:
+                color = random.choice(colors)
+                for state in attractor:
+                    node_colors[sts_nodes.index(state)] = color
+
+        # Draw the network
+        nx.draw_networkx(
+            sts,
+            with_labels=True,
+            pos=nx.spring_layout(sts),
+            node_color=node_colors,
+            font_size=8
+        )
+
+        plt.show()
