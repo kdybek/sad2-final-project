@@ -44,11 +44,24 @@ class BN:
         bin_str = ''.join(str(bit) for bit in state)
         return bin_str
 
+    @staticmethod
+    def __validate_mode(mode: str) -> None:
+        """
+        Validate the update mode.
+
+        Args:
+            mode (str): Update mode to validate.
+
+        Raises:
+            AssertionError: If the mode is not 'sync' or 'async'.
+        """
+        assert mode in ('sync', 'async'), "Mode must be either 'sync' or 'async'."
+
     # --------------------------------------------------------------------------
     # Constructor
     # --------------------------------------------------------------------------
 
-    def __init__(self, list_of_nodes: list[str], list_of_functions: list[str], mode: str):
+    def __init__(self, list_of_nodes: list[str], list_of_functions: list[str]):
         """
         Initialize the Boolean Network.
 
@@ -56,11 +69,7 @@ class BN:
             list_of_nodes (list[str]): List of node names.
             list_of_functions (list[str]): List of Boolean expressions for each node,
                 e.g. '(x0 & ~x1) | x2', where 'x0', 'x1', and 'x2' are node names.
-            mode (str): Update mode, either 'async' or 'sync'.
         """
-        assert mode in ['async', 'sync'], "Mode must be 'async' or 'sync'."
-
-        self.mode = mode
         self.num_nodes = len(list_of_nodes)
         self.node_names = list_of_nodes
 
@@ -78,16 +87,19 @@ class BN:
     # State transitions
     # --------------------------------------------------------------------------
 
-    def get_neighbor_states(self, state: tuple[int, ...]) -> set[tuple[int, ...]]:
+    def get_neighbor_states(self, state: tuple[int, ...], mode: str) -> set[tuple[int, ...]]:
         """
         Compute all states reachable from the given state in one update.
 
         Args:
             state (tuple[int, ...]): Tuple of 0s and 1s representing the current state.
+            mode (str): Update mode, either 'sync' for synchronous or 'async' for asynchronous.
 
         Returns:
             set[tuple[int, ...]]: Set of next states reachable in one step.
         """
+        self.__validate_mode(mode)
+
         neighbor_states = []
         substitutions = {
             self.list_of_nodes[i]:
@@ -95,7 +107,7 @@ class BN:
             for i, node_value in enumerate(state)
         }
 
-        if self.mode == 'sync':
+        if mode == 'sync':
             new_state = []
             for fun in self.functions:
                 new_node_value = 1 if fun.subs(
@@ -117,19 +129,24 @@ class BN:
     # State transition system
     # --------------------------------------------------------------------------
 
-    def generate_state_transition_system(self) -> nx.DiGraph:
+    def generate_state_transition_system(self, mode: str) -> nx.DiGraph:
         """
         Generate the state transition system (STS) of the Boolean network.
+
+        Args:
+            mode (str): Update mode, either 'sync' for synchronous or 'async' for asynchronous.
 
         Returns:
             nx.DiGraph: Directed graph representing the STS.
         """
+        self.__validate_mode(mode)
+
         G = nx.DiGraph()
 
         # Loop over all possible states (2^n)
         for initial_state_int in range(2 ** self.num_nodes):
             initial_state = self.__int_to_state(initial_state_int)
-            neighbor_states = self.get_neighbor_states(initial_state)
+            neighbor_states = self.get_neighbor_states(initial_state, mode)
 
             G.add_node(self.__state_to_binary_str(initial_state))
 
@@ -142,63 +159,3 @@ class BN:
             G.add_edges_from(edges)
 
         return G
-
-    # --------------------------------------------------------------------------
-    # Attractor analysis
-    # --------------------------------------------------------------------------
-
-    def get_attractors(self) -> list[set[tuple[int]]]:
-        """
-        Compute attractors of the Boolean network.
-
-        Returns:
-            list[set[tuple[int]]]: List of attractors. Each attractor is a set of states.
-        """
-        sts = self.generate_state_transition_system()
-        attractors = [attractor for attractor in nx.attracting_components(sts)]
-        return attractors
-
-    # --------------------------------------------------------------------------
-    # Visualization
-    # --------------------------------------------------------------------------
-
-    def draw_state_transition_system(self, highlight_attractors: bool = True) -> None:
-        """
-        Draw the state transition system.
-
-        Args:
-            highlight_attractors (bool, optional): If True, states belonging to different attractors
-                are drawn using distinct colors. Defaults to True.
-
-        Returns:
-            None
-        """
-        NON_ATTRACTOR_STATE_COLOR = 'grey'
-        sts = self.generate_state_transition_system()
-
-        # Assign colors to attractors if highlighting is enabled
-        if highlight_attractors:
-            attractors = self.get_attractors()
-            sts_nodes = list(sts.nodes)
-            node_colors = [NON_ATTRACTOR_STATE_COLOR for _ in sts_nodes]
-
-            colors = list(mcolors.CSS4_COLORS)
-            for color_to_remove in ('white', NON_ATTRACTOR_STATE_COLOR):
-                if color_to_remove in colors:
-                    colors.remove(color_to_remove)
-
-            for attractor in attractors:
-                color = random.choice(colors)
-                for state in attractor:
-                    node_colors[sts_nodes.index(state)] = color
-
-        # Draw the network
-        nx.draw_networkx(
-            sts,
-            with_labels=True,
-            pos=nx.spring_layout(sts),
-            node_color=node_colors,
-            font_size=8
-        )
-
-        plt.show()
