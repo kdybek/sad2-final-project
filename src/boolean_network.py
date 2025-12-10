@@ -158,4 +158,49 @@ class BN:
             ]
             G.add_edges_from(edges)
 
-        return G
+
+# --------------------------------------------------------------------------
+# Visualization
+# --------------------------------------------------------------------------
+
+def draw_state_transition_system(state_transition_system: nx.DiGraph, highlight_attractors: bool = True) -> None:
+    """
+    Draw the state transition system.
+
+    Args:
+        state_transition_system (nx.DiGraph): The state transition system to draw.
+        highlight_attractors (bool, optional): If True, states belonging to different attractors
+            are drawn using distinct colors. Defaults to True.
+
+    Returns:
+        None
+    """
+    NON_ATTRACTOR_STATE_COLOR = 'grey'
+
+    # Assign colors to attractors if highlighting is enabled
+    if highlight_attractors:
+        attractors = [attractor for attractor in nx.attracting_components(
+            state_transition_system)]
+        sts_nodes = list(state_transition_system.nodes)
+        node_colors = [NON_ATTRACTOR_STATE_COLOR for _ in sts_nodes]
+
+        colors = list(mcolors.CSS4_COLORS)
+        for color_to_remove in ('white', NON_ATTRACTOR_STATE_COLOR):
+            if color_to_remove in colors:
+                colors.remove(color_to_remove)
+
+        for attractor in attractors:
+            color = random.choice(colors)
+            for state in attractor:
+                node_colors[sts_nodes.index(state)] = color
+
+    # Draw the network
+    nx.draw_networkx(
+        state_transition_system,
+        with_labels=True,
+        pos=nx.spring_layout(state_transition_system),
+        node_color=node_colors,
+        font_size=8
+    )
+
+    plt.show()
