@@ -8,6 +8,41 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import pickle
 
 
+# ---  Configuration Constants ---
+
+# Maximum number of parents per node in random Boolean functions.
+# This should not be edited, because it was specified in the project description.
+MAX_PARENTS = 3
+
+# Random seeds for dataset generation.
+# For each seed, a separate part of the dataset is generated.
+# More seeds lead to larger datasets.
+# I have done it in this way to parallelize the dataset generation.
+NUM_SEEDS = 8
+SEEDS = range(NUM_SEEDS)
+
+# List of number of nodes for the random Boolean networks.
+# For each seed, Boolean networks with these numbers of nodes are generated.
+# Only the middle values should be edited.
+NUM_NODES_LIST = [5, 7, 10, 13, 16]
+
+# Parameters for trajectory generation.
+# For every Boolean network, datasets are generated
+# for all combinations of these parameters.
+# Feel free to edit these (except for MODES).
+MODES = ['sync', 'async']
+NUM_TAJS_LIST = [10, 20, 50]
+TRAJ_LEN_LIST = [20, 50, 100]
+STEP_LIST = [1, 2, 3]
+
+# Number of samples per parameter combination and mode.
+# Multiple samples are taken, because they may differ
+# in the attractor to transient state ratio.
+# Feel free to edit these.
+NUM_SYNC_SAMPLES = 4  # Only first state is random in sync mode so we sample less
+NUM_ASYNCH_SAMPLES = 16  # There is more randomness in async mode so we sample more
+
+
 def generate_random_functions(list_of_nodes: list[str]) -> list[str]:
     """
     Generate random Boolean functions.
@@ -18,7 +53,6 @@ def generate_random_functions(list_of_nodes: list[str]) -> list[str]:
     Returns:
         list[str]: List of randomly generated Boolean functions.
     """
-    MAX_PARENTS = 3
     num_nodes = len(list_of_nodes)
     functions = []
 
@@ -106,16 +140,9 @@ def generate_datasets_for_single_bn(bn: BN) -> list[dict[str, Any]]:
         list[dict[str, Any]]: List of dictionaries containing
             parameters and trajectories.
     """
-    NUM_TAJS_LIST = [10, 20, 50]
-    TRAJ_LEN_LIST = [20, 50, 100]
-    STEP_LIST = [1, 2, 3]
-
-    NUM_SYNC_SAMPLES = 4  # Only first state is random in sync mode so we sample less
-    NUM_ASYNCH_SAMPLES = 16  # There is more randomness in async mode so we sample more
-
     product_iter = product(NUM_TAJS_LIST, TRAJ_LEN_LIST, STEP_LIST)
     datasets = []
-    for mode in ['sync', 'async']:
+    for mode in MODES:
         sts = bn.generate_state_transition_system(mode=mode)
         attractors = nx.attracting_components(sts)
         attracting_states = set(
@@ -152,8 +179,6 @@ def generate_big_dataset_from_random_bns(seed: int) -> list[dict[str, Any]]:
         list[dict[str, Any]]: List of dictionaries containing
             parameters and trajectories.
     """
-    NUM_NODES_LIST = [5, 7, 10, 13, 16]
-
     random.seed(seed)
 
     big_dataset = []
@@ -173,8 +198,6 @@ def generate_big_dataset_from_random_bns(seed: int) -> list[dict[str, Any]]:
 
 
 def main() -> None:
-    SEEDS = [42, 43, 44, 45, 46, 47, 48, 49, 50, 51]
-
     big_dataset = []
     with ProcessPoolExecutor(max_workers=10) as executor:
         futures = [
