@@ -199,7 +199,7 @@ def generate_big_dataset_from_random_bns(seed: int) -> list[dict[str, Any]]:
 
 def main() -> None:
     big_dataset = []
-    with ProcessPoolExecutor(max_workers=10) as executor:
+    with ProcessPoolExecutor(max_workers=8) as executor:
         futures = [
             executor.submit(generate_big_dataset_from_random_bns, seed)
             for seed in SEEDS
