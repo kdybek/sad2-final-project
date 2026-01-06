@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
-from .boolean_network import BN
+from boolean_network import BN
 
 
 def _normalize_expr(expr: str) -> str:
