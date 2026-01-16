@@ -6,44 +6,58 @@ from itertools import product
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import pickle
+from absl import flags, app
 
 
-# ---  Configuration Constants ---
+FLAGS = flags.FLAGS
 
 # Maximum number of parents per node in random Boolean functions.
 # This should not be edited, because it was specified in the project description.
-MAX_PARENTS = 3
+FLAGS.DEFINE_integer('max_parents', 3, 'Maximum number of parents per node.')
 
 # Random seeds for dataset generation.
 # For each seed, a separate part of the dataset is generated.
 # More seeds lead to larger datasets.
 # I have done it in this way to parallelize the dataset generation.
-NUM_SEEDS = 8
-SEEDS = range(NUM_SEEDS)
+FLAGS.DEFINE_integer('num_seeds', 8, 'Number of random seeds for dataset generation.')
 
 # List of number of nodes for the random Boolean networks.
 # For each seed, Boolean networks with these numbers of nodes are generated.
 # Only the middle values should be edited.
-NUM_NODES_LIST = [5, 10, 16]
+FLAGS.DEFINE_multi_integer(
+    'num_nodes_list',
+    [5, 7, 10, 13, 16],
+    'List of numbers of nodes for the Boolean networks.'
+)
 
 # Parameters for trajectory generation.
 # For every Boolean network, datasets are generated
 # for all combinations of these parameters.
 # Feel free to edit these (except for MODES).
-MODES = ['sync', 'async']
-NUM_TAJS_LIST = [10, 20, 50]
-TRAJ_LEN_LIST = [20, 50, 100]
-STEP_LIST = [1, 2, 3]
+FLAGS.DEFINE_multi_string('modes', ['sync', 'async'],
+                          'List of update modes for simulation.')
+FLAGS.DEFINE_multi_integer(
+    'num_trajs_list', [10, 20, 50], 'List of numbers of trajectories to simulate.')
+FLAGS.DEFINE_multi_integer(
+    'traj_len_list', [20, 50, 100], 'List of trajectory lengths to simulate.')
+FLAGS.DEFINE_multi_integer(
+    'step_list', [1, 2, 3], 'List of step sizes for sampling states.')
 
 # Number of samples per parameter combination and mode.
 # Multiple samples are taken, because they may differ
 # in the attractor to transient state ratio.
 # Feel free to edit these.
-NUM_SYNC_SAMPLES = 4  # Only first state is random in sync mode so we sample less
-NUM_ASYNCH_SAMPLES = 16  # There is more randomness in async mode so we sample more
+FLAGS.DEFINE_integer(
+    'sync_samples', 4, 'Number of samples per parameter combination in sync mode.')
+FLAGS.DEFINE_integer('asynch_samples', 16,
+                     'Number of samples per parameter combination in async mode.')
+
+FLAGS.DEFINE_integer('max_workers', 8, 'Number of parallel workers.')
+FLAGS.DEFINE_string('output_file', 'boolean_network_datasets.pkl',
+                    'Output file for the generated datasets.')
 
 
-def generate_random_functions(list_of_nodes: list[str]) -> list[str]:
+def generate_random_functions(list_of_nodes: list[str], max_parents: int) -> list[str]:
     """
     Generate random Boolean functions.
 
@@ -57,7 +71,7 @@ def generate_random_functions(list_of_nodes: list[str]) -> list[str]:
     functions = []
 
     for _ in range(num_nodes):
-        k = random.randint(0, MAX_PARENTS)
+        k = random.randint(0, max_parents)
         if k == 0:
             functions.append(random.choice(['0', '1']))
             continue
@@ -131,11 +145,13 @@ def generate_trajectories(
 
 def generate_datasets_for_single_bn(
         bn: BN,
-        num_traj_list: list[int] = NUM_TAJS_LIST,
-        traj_len_list: list[int] = TRAJ_LEN_LIST,
-        step_list: list[int] = STEP_LIST,
-        modes: list[str] = MODES, 
-        ) -> list[dict[str, Any]]:
+        modes: list[str],
+        num_trajs_list: list[int],
+        traj_len_list: list[int],
+        step_list: list[int],
+        num_sync_samples: int,
+        num_asynch_samples: int,
+) -> list[dict[str, Any]]:
     """
     Generate datasets of Boolean network trajectories.
 
@@ -148,14 +164,12 @@ def generate_datasets_for_single_bn(
     """
     datasets = []
     for mode in modes:
-        product_iter = product(num_traj_list, traj_len_list, step_list)
-        # print(f"MODE: {mode}")
         sts = bn.generate_state_transition_system(mode=mode)
         attractors = nx.attracting_components(sts)
         attracting_states = set(
             state for attractor in attractors for state in attractor)
-        samples = NUM_SYNC_SAMPLES if mode == 'sync' else NUM_ASYNCH_SAMPLES
-        for num_traj, traj_len, step in product_iter:
+        samples = num_sync_samples if mode == 'sync' else num_asynch_samples
+        for num_traj, traj_len, step in product(num_trajs_list, traj_len_list, step_list):
             for _ in range(samples):
                 trajs, attractor_fraction = generate_trajectories(
                     state_transition_system=sts,
@@ -170,13 +184,22 @@ def generate_datasets_for_single_bn(
                     'mode': mode,
                     'step': step,
                 }
-                # print(f"mode in data entry: {current_mode}")
                 datasets.append(data_entry)
 
     return datasets
 
 
-def generate_big_dataset_from_random_bns(seed: int) -> list[dict[str, Any]]:
+def generate_big_dataset_from_random_bns(
+    seed: int,
+    num_nodes_list: list[int],
+    modes: list[str],
+    num_trajs_list: list[int],
+    traj_len_list: list[int],
+    step_list: list[int],
+    max_parents: int,
+    num_sync_samples: int,
+    num_asynch_samples: int
+) -> list[dict[str, Any]]:
     """
     Generate a dataset from randomly generated Boolean networks.
 
@@ -190,13 +213,24 @@ def generate_big_dataset_from_random_bns(seed: int) -> list[dict[str, Any]]:
     random.seed(seed)
 
     big_dataset = []
-    for num_nodes in tqdm(NUM_NODES_LIST, desc="Iterating over BNs"):
-        node_names = [f'x{i}' for i in range(num_nodes)]
-        functions = generate_random_functions(node_names)
-        bn = BN(node_names, functions)
-        datasets = generate_datasets_for_single_bn(bn)
+    for num_nodes in tqdm(num_nodes_list, desc="Iterating over BNs"):
+        list_of_nodes = [f'x{i}' for i in range(num_nodes)]
+        functions = generate_random_functions(
+            list_of_nodes=list_of_nodes,
+            max_parents=max_parents
+        )
+        bn = BN(list_of_nodes, functions)
+        datasets = generate_datasets_for_single_bn(
+            bn=bn,
+            modes=modes,
+            num_trajs_list=num_trajs_list,
+            traj_len_list=traj_len_list,
+            step_list=step_list,
+            num_sync_samples=num_sync_samples,
+            num_asynch_samples=num_asynch_samples
+        )
         data_entry = {
-            'list_of_nodes': node_names,
+            'list_of_nodes': list_of_nodes,
             'list_of_functions': functions,
             'nodes_readable': bn.return_indexed_edges(),
             'datasets': datasets
@@ -208,17 +242,29 @@ def generate_big_dataset_from_random_bns(seed: int) -> list[dict[str, Any]]:
 
 def main() -> None:
     big_dataset = []
-    with ProcessPoolExecutor(max_workers=8) as executor:
+    seeds = list(range(FLAGS.num_seeds))
+    with ProcessPoolExecutor(max_workers=FLAGS.max_workers) as executor:
         futures = [
-            executor.submit(generate_big_dataset_from_random_bns, seed)
-            for seed in SEEDS
+            executor.submit(
+                generate_big_dataset_from_random_bns,
+                seed=seed,
+                num_nodes_list=FLAGS.num_nodes_list,
+                modes=FLAGS.modes,
+                num_trajs_list=FLAGS.num_trajs_list,
+                traj_len_list=FLAGS.traj_len_list,
+                step_list=FLAGS.step_list,
+                max_parents=FLAGS.max_parents,
+                num_sync_samples=FLAGS.sync_samples,
+                num_asynch_samples=FLAGS.asynch_samples
+            )
+            for seed in seeds
         ]
         for future in as_completed(futures):
             big_dataset.extend(future.result())
 
-    with open('boolean_network_datasets.pkl', 'wb') as f:
+    with open(FLAGS.output_file, 'wb') as f:
         pickle.dump(big_dataset, f)
 
 
 if __name__ == "__main__":
-    main()
+    app.run(main)
