@@ -24,7 +24,7 @@ SEEDS = range(NUM_SEEDS)
 # List of number of nodes for the random Boolean networks.
 # For each seed, Boolean networks with these numbers of nodes are generated.
 # Only the middle values should be edited.
-NUM_NODES_LIST = [5, 7, 10, 13, 16]
+NUM_NODES_LIST = [5, 10, 16]
 
 # Parameters for trajectory generation.
 # For every Boolean network, datasets are generated
@@ -198,6 +198,7 @@ def generate_big_dataset_from_random_bns(seed: int) -> list[dict[str, Any]]:
         data_entry = {
             'list_of_nodes': node_names,
             'list_of_functions': functions,
+            'nodes_readable': bn.return_indexed_edges(),
             'datasets': datasets
         }
         big_dataset.append(data_entry)

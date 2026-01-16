@@ -22,9 +22,13 @@ def main(argv) -> None:
     base = os.path.splitext(os.path.basename(bnet_path))[0] + '.pkl'
     output = os.path.join(FLAGS.output_path, base)
     os.makedirs(FLAGS.output_path, exist_ok=True)
+
+    all_info = dict()
+    all_info['all_trajectories'] = dataset
+    all_info['edges'] = bn.return_indexed_edges()
     
     with open(output, 'wb') as f:
-        pickle.dump(dataset, f)
+        pickle.dump(all_info, f)
 
     print(f"Saved dataset to {output}")
 

@@ -3,6 +3,8 @@ import boolean as bool
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import random
+import random
+import re
 
 # Code from laboratories for SAD2 course at MIM UW.
 
@@ -15,6 +17,58 @@ class BN:
     # --------------------------------------------------------------------------
     # Helper methods
     # --------------------------------------------------------------------------
+
+    def dependency_edges(self) -> list[tuple[str, str]]:
+        """
+        Return list of edges (source_node, target_node) where source_node
+        appears in the Boolean function of target_node.
+        """
+        edges: list[tuple[str, str]] = []
+        for target_idx, fun in enumerate(self.functions):
+            fun_str = str(fun)
+            for source_name in self.node_names:
+                # use word boundaries to avoid substrings (x1 vs x10)
+                if re.search(r'\b' + re.escape(source_name) + r'\b', fun_str):
+                    edges.append((source_name, self.node_names[target_idx]))
+        return edges
+
+    def __str__(self) -> str:
+        """
+        String summary of the Boolean Network using node indices instead of names.
+        """
+        # Map node names to indices
+        name_to_index = {name: i for i, name in enumerate(self.node_names)}
+
+        # Compute dependency edges using indices
+        indexed_edges = []
+        for target_idx, fun in enumerate(self.functions):
+            fun_str = str(fun)
+            for source_name, source_idx in name_to_index.items():
+                if re.search(r'\b' + re.escape(source_name) + r'\b', fun_str):
+                    indexed_edges.append((source_idx, target_idx))
+
+        nodes = tuple(range(self.num_nodes))
+        edges = tuple(indexed_edges)
+
+        return f"BN(nodes={nodes}, edges={edges})"
+    
+    def return_indexed_edges(self):
+        # Map node names to indices
+        name_to_index = {name: i for i, name in enumerate(self.node_names)}
+
+        # Compute dependency edges using indices
+        indexed_edges = []
+        for target_idx, fun in enumerate(self.functions):
+            fun_str = str(fun)
+            for source_name, source_idx in name_to_index.items():
+                if re.search(r'\b' + re.escape(source_name) + r'\b', fun_str):
+                    indexed_edges.append((source_idx, target_idx))
+
+        # nodes = tuple(range(self.num_nodes))
+        edges = tuple(indexed_edges)
+
+        return edges
+
 
     def __int_to_state(self, x: int) -> tuple[int, ...]:
         """
@@ -196,6 +250,7 @@ def draw_state_transition_system(state_transition_system: nx.DiGraph, highlight_
             for state in attractor:
                 node_colors[sts_nodes.index(state)] = color
 
+    
     # Draw the network
     nx.draw_networkx(
         state_transition_system,
