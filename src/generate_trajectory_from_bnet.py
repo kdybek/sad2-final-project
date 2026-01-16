@@ -1,4 +1,4 @@
-from dataset_gen import generate_datasets_for_single_bn
+from dataset_gen_utils import generate_dataset_for_single_bn
 from parse_bnet import parse_bnet_file
 from absl import flags, app
 import pickle
@@ -15,7 +15,8 @@ def main(argv) -> None:
     bn = parse_bnet_file(bnet_path)
 
     # Generate datasets for the provided BN
-    dataset = generate_datasets_for_single_bn(bn)
+    # TODO: fill in the ... with appropriate parameters
+    dataset = generate_dataset_for_single_bn(bn, ...)
     print(f"Generated dataset with {len(dataset)} entries for BN from {bnet_path}")
     
     # Save output to a file named from the input bnet basename

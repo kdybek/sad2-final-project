@@ -93,7 +93,7 @@ def generate_trajectories(
     return trajs, attractor_fraction
 
 
-def generate_datasets_for_single_bn(
+def generate_grid_search_datasets_from_single_bn(
         bn: BN,
         modes: list[str],
         num_trajs_list: list[int],
@@ -103,7 +103,7 @@ def generate_datasets_for_single_bn(
         num_asynch_samples: int,
 ) -> list[dict[str, Any]]:
     """
-    Generate datasets of Boolean network trajectories.
+    Generate grid search datasets of Boolean network trajectories.
 
     Args:
         bn (BN): Boolean network instance.
@@ -145,6 +145,48 @@ def generate_datasets_for_single_bn(
     return datasets
 
 
+def generate_dataset_from_single_bn(
+    bn: BN,
+    mode: str,
+    num_traj: int,
+    traj_len: int,
+    step: int
+) -> dict[str, Any]:
+    """
+    Generate a dataset of Boolean network trajectories.
+
+    Args:
+        bn (BN): Boolean network instance.
+        mode (str): Update mode for simulation.
+        num_traj (int): Number of trajectories to simulate.
+        traj_len (int): Length of each trajectory.
+        step (int): Step size for sampling states.
+
+    Returns:
+        dict[str, Any]: Dictionary containing parameters and trajectories.
+    """
+    sts = bn.generate_state_transition_system(mode=mode)
+    attractors = nx.attracting_components(sts)
+    attracting_states = set(
+        state for attractor in attractors for state in attractor)
+
+    trajs, attractor_fraction = generate_trajectories(
+        state_transition_system=sts,
+        attracting_states=attracting_states,
+        num_traj=num_traj,
+        traj_len=traj_len,
+        step=step)
+
+    data_entry = {
+        'trajectories': trajs,
+        'attractor_fraction': attractor_fraction,
+        'mode': mode,
+        'step': step,
+    }
+
+    return data_entry
+
+
 def generate_big_dataset_from_random_bns(
     seed: int,
     num_nodes_list: list[int],
@@ -184,7 +226,7 @@ def generate_big_dataset_from_random_bns(
             max_parents=max_parents
         )
         bn = BN(list_of_nodes, functions)
-        datasets = generate_datasets_for_single_bn(
+        datasets = generate_grid_search_datasets_from_single_bn(
             bn=bn,
             modes=modes,
             num_trajs_list=num_trajs_list,
