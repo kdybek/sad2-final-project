@@ -24,7 +24,7 @@ SEEDS = range(NUM_SEEDS)
 # List of number of nodes for the random Boolean networks.
 # For each seed, Boolean networks with these numbers of nodes are generated.
 # Only the middle values should be edited.
-NUM_NODES_LIST = [5, 7, 10, 13, 16]
+NUM_NODES_LIST = [5, 10, 16]
 
 # Parameters for trajectory generation.
 # For every Boolean network, datasets are generated
@@ -129,7 +129,13 @@ def generate_trajectories(
     return trajs, attractor_fraction
 
 
-def generate_datasets_for_single_bn(bn: BN) -> list[dict[str, Any]]:
+def generate_datasets_for_single_bn(
+        bn: BN,
+        num_traj_list: list[int] = NUM_TAJS_LIST,
+        traj_len_list: list[int] = TRAJ_LEN_LIST,
+        step_list: list[int] = STEP_LIST,
+        modes: list[str] = MODES, 
+        ) -> list[dict[str, Any]]:
     """
     Generate datasets of Boolean network trajectories.
 
@@ -140,9 +146,10 @@ def generate_datasets_for_single_bn(bn: BN) -> list[dict[str, Any]]:
         list[dict[str, Any]]: List of dictionaries containing
             parameters and trajectories.
     """
-    product_iter = product(NUM_TAJS_LIST, TRAJ_LEN_LIST, STEP_LIST)
     datasets = []
-    for mode in MODES:
+    for mode in modes:
+        product_iter = product(num_traj_list, traj_len_list, step_list)
+        # print(f"MODE: {mode}")
         sts = bn.generate_state_transition_system(mode=mode)
         attractors = nx.attracting_components(sts)
         attracting_states = set(
@@ -163,6 +170,7 @@ def generate_datasets_for_single_bn(bn: BN) -> list[dict[str, Any]]:
                     'mode': mode,
                     'step': step,
                 }
+                # print(f"mode in data entry: {current_mode}")
                 datasets.append(data_entry)
 
     return datasets
@@ -190,6 +198,7 @@ def generate_big_dataset_from_random_bns(seed: int) -> list[dict[str, Any]]:
         data_entry = {
             'list_of_nodes': node_names,
             'list_of_functions': functions,
+            'nodes_readable': bn.return_indexed_edges(),
             'datasets': datasets
         }
         big_dataset.append(data_entry)
