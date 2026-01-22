@@ -14,16 +14,6 @@ def main(argv) -> None:
     bnet_path = FLAGS.bnet_path
     bn = parse_bnet_file(bnet_path)
 
-    """
-    def generate_dataset_from_single_bn(
-    bn: BN,
-    mode: str,
-    num_traj: int,
-    traj_len: int,
-    step: int
-) -> dict[str, Any]:
-    """
-
     # Generate datasets for the provided BN
     sts = bn.generate_state_transition_system(mode='sync')
     dataset = generate_trajectories(sts, 'sync', 10, 20, 1)
