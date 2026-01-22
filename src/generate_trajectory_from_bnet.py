@@ -1,4 +1,4 @@
-from dataset_gen_utils import generate_dataset_for_single_bn
+from dataset_gen_utils import generate_trajectories
 from parse_bnet import parse_bnet_file
 from absl import flags, app
 import pickle
@@ -15,8 +15,8 @@ def main(argv) -> None:
     bn = parse_bnet_file(bnet_path)
 
     # Generate datasets for the provided BN
-    # TODO: fill in the ... with appropriate parameters
-    dataset = generate_dataset_for_single_bn(bn, ...)
+    sts = bn.generate_state_transition_system(mode='sync')
+    dataset = generate_trajectories(sts, 'sync', 10, 20, 1)
     print(f"Generated dataset with {len(dataset)} entries for BN from {bnet_path}")
     
     # Save output to a file named from the input bnet basename
@@ -36,3 +36,4 @@ def main(argv) -> None:
 
 if __name__ == "__main__":
     app.run(main)
+g
